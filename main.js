@@ -171,6 +171,84 @@ function metQuota(date, activeTime) {
 // Returns: object with 10 properties or empty object {}
 // ============================================================
 function addShiftRecord(textFile, shiftObj) {
+    const fileContent = fs.readFileSync(textFile, { encoding: "utf8", flag: "r" }).trimEnd();
+    const lines = fileContent.length > 0 ? fileContent.split(/\r?\n/) : [];
+    const header = lines.length > 0
+        ? lines[0]
+        : "DriverID,DriverName,Date,StartTime,EndTime,ShiftDuration,IdleTime,ActiveTime,MetQuota,HasBonus";
+    const recordLines = lines.slice(1);
+
+    for (let i = 0; i < recordLines.length; i++) {
+        const fields = recordLines[i].split(",");
+        if (fields[0] === shiftObj.driverID && fields[2] === shiftObj.date) {
+            return {};
+        }
+    }
+
+    const newRecord = {
+        driverID: shiftObj.driverID,
+        driverName: shiftObj.driverName,
+        date: shiftObj.date,
+        startTime: shiftObj.startTime,
+        endTime: shiftObj.endTime,
+        shiftDuration: getShiftDuration(shiftObj.startTime, shiftObj.endTime),
+        idleTime: getIdleTime(shiftObj.startTime, shiftObj.endTime),
+        activeTime: "",
+        metQuota: false,
+        hasBonus: false
+    };
+
+    newRecord.activeTime = getActiveTime(newRecord.shiftDuration, newRecord.idleTime);
+    newRecord.metQuota = metQuota(newRecord.date, newRecord.activeTime);
+
+    const allRecords = recordLines.map((line) => {
+        const fields = line.split(",");
+
+        return {
+            driverID: fields[0],
+            driverName: fields[1],
+            date: fields[2],
+            startTime: fields[3],
+            endTime: fields[4],
+            shiftDuration: fields[5],
+            idleTime: fields[6],
+            activeTime: fields[7],
+            metQuota: fields[8] === "true",
+            hasBonus: fields[9] === "true"
+        };
+    });
+
+    allRecords.push(newRecord);
+    allRecords.sort((firstRecord, secondRecord) => {
+        if (firstRecord.driverID !== secondRecord.driverID) {
+            return firstRecord.driverID.localeCompare(secondRecord.driverID);
+        }
+
+        return firstRecord.date.localeCompare(secondRecord.date);
+    });
+
+    const updatedLines = [header];
+    for (let i = 0; i < allRecords.length; i++) {
+        const record = allRecords[i];
+        updatedLines.push(
+            [
+                record.driverID,
+                record.driverName,
+                record.date,
+                record.startTime,
+                record.endTime,
+                record.shiftDuration,
+                record.idleTime,
+                record.activeTime,
+                String(record.metQuota),
+                String(record.hasBonus)
+            ].join(",")
+        );
+    }
+
+    fs.writeFileSync(textFile, updatedLines.join("\n"), { encoding: "utf8" });
+
+    return newRecord;
 }
 
 // ============================================================
@@ -182,6 +260,23 @@ function addShiftRecord(textFile, shiftObj) {
 // Returns: nothing (void)
 // ============================================================
 function setBonus(textFile, driverID, date, newValue) {
+    const fileContent = fs.readFileSync(textFile, { encoding: "utf8", flag: "r" }).trimEnd();
+    if (fileContent.length === 0) {
+        return;
+    }
+
+    const lines = fileContent.split(/\r?\n/);
+
+    for (let i = 1; i < lines.length; i++) {
+        const fields = lines[i].split(",");
+        if (fields[0] === driverID && fields[2] === date) {
+            fields[9] = String(newValue);
+            lines[i] = fields.join(",");
+            break;
+        }
+    }
+
+    fs.writeFileSync(textFile, lines.join("\n"), { encoding: "utf8" });
 }
 
 // ============================================================
