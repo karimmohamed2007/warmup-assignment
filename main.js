@@ -120,6 +120,24 @@ function getIdleTime(startTime, endTime) {
 // Returns: string formatted as h:mm:ss
 // ============================================================
 function getActiveTime(shiftDuration, idleTime) {
+    function parseTime(timeStr) {
+        const timeParts = timeStr.split(":");
+        const hours = parseInt(timeParts[0]);
+        const minutes = parseInt(timeParts[1]);
+        const seconds = parseInt(timeParts[2]);
+
+        return hours * 3600 + minutes * 60 + seconds;
+    }
+
+    const shiftSeconds = parseTime(shiftDuration);
+    const idleSeconds = parseTime(idleTime);
+    const activeSeconds = shiftSeconds - idleSeconds;
+
+    const hours = Math.floor(activeSeconds / 3600);
+    const minutes = Math.floor((activeSeconds % 3600) / 60);
+    const seconds = activeSeconds % 60;
+
+    return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
 // ============================================================
@@ -129,6 +147,21 @@ function getActiveTime(shiftDuration, idleTime) {
 // Returns: boolean
 // ============================================================
 function metQuota(date, activeTime) {
+    const dateParts = date.split("-");
+    const year = parseInt(dateParts[0]);
+    const month = parseInt(dateParts[1]);
+    const day = parseInt(dateParts[2]);
+
+    const timeParts = activeTime.split(":");
+    const activeSeconds =
+        parseInt(timeParts[0]) * 3600 +
+        parseInt(timeParts[1]) * 60 +
+        parseInt(timeParts[2]);
+
+    const isEidPeriod = year === 2025 && month === 4 && day >= 10 && day <= 30;
+    const requiredSeconds = isEidPeriod ? 6 * 3600 : 8 * 3600 + 24 * 60;
+
+    return activeSeconds >= requiredSeconds;
 }
 
 // ============================================================
